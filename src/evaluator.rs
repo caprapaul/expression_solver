@@ -23,12 +23,15 @@ mod tests {
     
     #[test]
     fn test_evaluate() {
-        assert_eq!(-40.009087, evaluate("2*(sin(2)*-22)").unwrap());
-        assert_eq!(-40.0, evaluate("2* (2-22)").unwrap());
-        assert_eq!(0.0, evaluate("2*(123 + 22 / 4 + 1) * 0").unwrap());
-        assert_eq!(5.0, evaluate("2+1*3").unwrap());
+        let mut operations = Vec::new();
+        assert_eq!(-40.009087, evaluate("2*(sin(2)*-22)", &mut operations).unwrap());
+        assert_eq!(-40.0, evaluate("2* (2-22)", &mut operations).unwrap());
+        assert_eq!(0.0, evaluate("2*(123 + 22 / 4 + 1) * 0", &mut operations).unwrap());
+        assert_eq!(5.0, evaluate("2+1*3", &mut operations).unwrap());
     }
 }
+
+
 
 fn infix_to_rpn(tokens: Vec<Token>) -> Result<Vec<Token>, Error>{
     let mut operators = Vec::new();
@@ -82,21 +85,58 @@ fn infix_to_rpn(tokens: Vec<Token>) -> Result<Vec<Token>, Error>{
     return Ok(rpn);
 }
 
-fn calculate(left: f32, right: f32, operator: Operator) -> f32 {
+fn calculate(left: f32, right: f32, operator: Operator, operations: &mut Vec<String>) -> f32 {
     match operator {
         Operator::Function(function) => match function {
-            Function::Sin => right.sin(),
-            Function::Cos => right.cos(),
+            Function::Sin => {
+                let res = right.sin();
+                operations.push(format!("sin({}) = {}", right, res));
+                res
+            },
+            Function::Cos => {
+                let res = right.cos();
+                operations.push(format!("cos({}) = {}", right, res));
+                res
+            },
         },
-        Operator::Add(_) => left + right,
-        Operator::Substract(_) => left - right,
-        Operator::Multiply => left * right,
-        Operator::Divide => left / right,
+        Operator::Add(arity) => {
+            let res = left + right;
+            
+            if let Arity::Binary = arity {
+                operations.push(format!("{} + {} = {}", left, right, res));
+            }
+    
+    
+            res
+        },
+        Operator::Substract(arity) => {
+            let res = left - right;
+    
+            if let Arity::Binary = arity {
+                operations.push(format!("{} - {} = {}", left, right, res));
+            }
+            
+            res
+        },
+        Operator::Multiply => {
+            let res = left * right;
+            
+            operations.push(format!("{} * {} = {}", left, right, res));
+    
+            res
+        },
+        Operator::Divide => {
+            let res = left / right;
+    
+            operations.push(format!("{} / {} = {}", left, right, res));
+    
+            res
+        },
         _ => 0.0
     }
 }
 
-pub fn evaluate(expression: &str) -> Result<f32, Error> {
+pub fn evaluate(expression: &str, operations: &mut Vec<String>) -> Result<f32, Error> {
     let tokens = tokenize(expression)?;
     let tokens = infix_to_rpn(tokens)?;
     let mut values = Vec::new();
@@ -119,7 +159,7 @@ pub fn evaluate(expression: &str) -> Result<f32, Error> {
                     }
                 };
                 
-                values.push(calculate(left, right, operator));
+                values.push(calculate(left, right, operator, operations));
             },
             Token::Operand(Operand::Literal(value)) => values.push(value),
             _ => return Err(Error::new(ErrorKind::Other, format!("Variables not implemented.")))
